@@ -1,193 +1,79 @@
 # AP_sem3.1_repo
 
-# Hospital Management System - SmartCare
 
-A modular **Django 4.2** Hospital Management System for a multi-specialty
-hospital. It manages patients, appointments, admissions & beds, an in-house
-pharmacy (drug requests + retail sales), hospital inventory, staff with
-role-based access, and a public website with a blog and inquiry system.
+# QR Code Wizard
 
----
+A PHP command-line tool that generates numbered QR code PNG images using
+[`endroid/qr-code`](https://github.com/endroid/qr-code).
 
-## Features
+## Requirements
 
-- **Role-based access** for 5 roles - Admin, Doctor, Nurse, Receptionist,
-  Pharmacist - plus a **Head Nurse** privilege (a nurse who can manage the
-  hospital inventory).
-- **Patients & medical records** - registration, structured prescriptions,
-  PDF reports.
-- **Appointments** - booking, doctor availability, leave requests & approval.
-- **Admissions** - 6-floor / department layout, rooms & beds, admission
-  requests and discharge, emergency admissions.
-- **In-house pharmacy**
-  - **Nurse -> Pharmacy drug requests**: nurses request medicine, pharmacy
-    approves/rejects and dispenses (internal stock movement).
-  - **Retail sales & billing**: walk-in sales generate an invoice + printable
-    receipt with cash/card/insurance/mobile payment.
-- **Hospital inventory** (equipment / surgical / consumables) - managed by the
-  Head Nurse, view-only for other nurses.
-- **Admin analytics dashboard** - hospital-wide KPIs, bed occupancy by floor,
-  revenue, low stock, and more.
-- **Public website** - landing pages, doctor blogs, contact & appointment
-  inquiries with email replies.
+- PHP 8.2 or newer
+- Composer
+- PHP GD extension (used by the PNG writer)
 
----
+## Installation
 
-## Tech Stack
+From the project directory, install the locked Composer dependencies:
 
-- **Backend:** Django 4.2 (Python)
-- **Database:** SQLite
-- **Frontend:** Django Templates, Bootstrap 5, crispy-forms
-- **Auth:** Django auth with a custom `users.User` model + role middleware
-- **PDF:** xhtml2pdf · **Email/OTP:** SMTP + IMAP (Gmail)
-
----
-
-## Project Structure
-
-```
-hospital-management-system/
-├── core/            # Shared constants, decorators, mixins, utils
-├── users/           # Auth, roles, profiles, admin analytics
-├── patient/         # Patients, records, rooms/beds, admissions
-├── appointment/     # Appointments, availability, leave, dashboards
-├── pharmacy/        # Medicines, sales, drug requests, hospital inventory
-├── billing/         # Billing models (patient billing - light)
-├── website/         # Public site, blog, inquiries
-├── hms_project/     # Project config
-│   └── settings/    # base.py / dev.py / prod.py (env-selected)
-├── templates/       # Shared HTML templates
-├── static/          # CSS, JS, fonts
-├── setup/           # Data-seeding & maintenance scripts (see setup/README.md)
-├── docs/            # Feature docs (e.g. DRUG_REQUESTS.md)
-├── manage.py
-└── requirements.txt
+```sh
+composer install
 ```
 
-Each app is organized modularly: `views/` and `forms/` are **packages split by
-feature**, with business logic in `services.py` and read queries in
-`selectors.py`.
+## Generate QR codes
 
----
+Run the generator from the project directory:
 
-## Installation & Setup
-
-### 1. Clone & create a virtual environment
-```bash
-git clone <repo-url>
-cd hospital-management-system
-python -m venv venv
-venv\Scripts\activate        # Windows
-source venv/bin/activate     # Linux / macOS
+```sh
+php generate_qrcodes.php
 ```
 
-### 2. Install dependencies
-```bash
-pip install -r requirements.txt
+The script creates a `qrcodes/` directory if needed and generates 10,000 PNG
+files:
+
+```text
+qrcodes/
+├── qr_00001.png
+├── qr_00002.png
+└── ...
+└── qr_10000.png
 ```
 
-### 3. Configure environment variables
-Create a `.env` file in the project root (it is git-ignored):
-```
-# Email (Gmail address + app password) - required for OTP & inquiry emails
-EMAIL_HOST=your.address@gmail.com
-EMAIL_APP_PASSKEY=your-gmail-app-password
-SITE_URL=http://127.0.0.1:8000
+Each QR code contains its five-digit number and displays the same number as a
+label. The current configuration uses high error correction, a 300-pixel size,
+a margin of 10, and a 16-point Open Sans label.
 
-# Optional
-SECRET_KEY=change-me-in-production
-DJANGO_ENV=dev            # 'dev' (default) or 'prod'
-```
-Set `SITE_URL` to the public HTTPS URL when deploying so blog notification
-links point to the deployed site. Email credentials are only needed when
-sending or checking email.
+Generated files are ignored by Git via `.gitignore`.
 
-### 4. Apply migrations
-```bash
-python manage.py migrate
+## Tests
+
+The repository includes a standalone PHP test script. Run it with:
+
+```sh
+php -l generate_qrcodes.php
+php -l tests/generate_qrcodes_test.php
+php tests/generate_qrcodes_test.php
 ```
 
-### 5. (Optional) Seed demo data
-Utility scripts live in `setup/` - run from the project root:
-```bash
-python setup/data_import.py
-```
-See **`setup/README.md`** for all available scripts.
+The test script checks PNG output, renderer substitution, and error handling
+for invalid output paths and renderers that fail to create a non-empty file.
 
-### 6. Create an admin user
-```bash
-python manage.py createsuperuser
-```
-(Then set that user's role to Admin in the Django admin, or use the
-`create_default_users` / `setup_hospital` management commands.)
+## Design and refactoring
 
-### 7. Run the server
-```bash
-python manage.py runserver
-```
-Open http://127.0.0.1:8000/  ·  Admin panel: http://127.0.0.1:8000/admin/
+The generator is structured around the SOLID principles:
 
----
+- **Single Responsibility:** QR rendering is separated from batch generation
+  and output-directory validation.
+- **Open/Closed:** New renderer implementations can be added through the
+  `QrCodeRenderer` interface without changing the generation loop.
+- **Liskov Substitution:** Renderer implementations are expected to return a
+  safe file extension and create a non-empty file; the generator validates
+  those expectations.
+- **Interface Segregation:** The renderer interface contains only the two
+  related operations required by the generator.
+- **Dependency Inversion:** The generator accepts the renderer abstraction;
+  the command-line entry point supplies the PNG implementation.
 
-## Environments
+See [SOLID_REFACTOR.md](./SOLID_REFACTOR.md) for the detailed refactoring
+rationale and test coverage.
 
-Settings are split into `hms_project/settings/{base,dev,prod}.py` and selected
-by the `DJANGO_ENV` variable (`dev` by default). `dev` enables DEBUG and local
-hosts; `prod` disables DEBUG, sets allowed hosts, and enables security cookies.
-
----
-
-## Roles & Access
-
-| Role | Can do |
-|------|--------|
-| **Admin** | Full access to everything, incl. the analytics dashboard |
-| **Doctor** | Appointments, patients, medical records, admissions, leave, blogs |
-| **Nurse** | Assigned patients, admissions, drug requests, view inventory & medicines |
-| **Head Nurse** | Everything a nurse can, **plus** manage the hospital inventory |
-| **Receptionist** | Register patients, book appointments, handle inquiries |
-| **Pharmacist** | Medicines, purchases, sales/billing, dispense drug requests |
-
-Access is enforced by `users.middleware.RoleBasedAccessMiddleware` plus
-per-view role decorators in `core.decorators`.
-
----
-
-## Key Workflows
-
-- **Nurse <-> Pharmacy drug requests** - a nurse requests medicine for a
-  patient; the pharmacy approves/rejects and dispenses, which deducts pharmacy
-  stock. Full docs in `docs/DRUG_REQUESTS.md`.
-- **Pharmacy retail sale** - `Pharmacy -> Sales -> Add Sale` creates a `Sale`
-  (invoice), deducts stock, and produces a printable receipt.
-- **Hospital inventory** - `Hospital Inventory` in the nurse menu; the Head
-  Nurse sees Add/Edit, other nurses get view + search only.
-- **Admin analytics** - the Admin dashboard shows live hospital-wide metrics.
-
----
-
-## Management Commands
-
-- `python manage.py create_default_users` - create default staff accounts
-- `python manage.py setup_hospital` - set up floors, rooms and beds
-- `python manage.py setup_nurse_assignments` - assign nurses to floors
-- `python manage.py setup_test_data` - populate test data
-- `python manage.py check_email_replies` - poll inbound email replies
-
----
-
-## Setup / Maintenance Scripts
-
-Standalone data-seeding and maintenance utilities live in **`setup/`**
-(run from the project root, e.g. `python setup/data_import.py`). See
-`setup/README.md` for the full list.
-
----
-
-## License
-
-Intended for **educational and learning purposes**.
-
-## Author
-
-**Raj Patel** - https://github.com/R204570
